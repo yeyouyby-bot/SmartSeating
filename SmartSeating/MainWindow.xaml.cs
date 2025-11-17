@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -71,6 +72,10 @@ namespace SmartSeating
         private readonly ObservableCollection<Student> _students = new();
         private readonly HashSet<(int row, int col)> _selection = new();
         private readonly Random _random = new();
+        private readonly string _noSeatLabel = "(未分配)";
+
+        private ICollectionView? _studentView;
+        private string _studentSearchText = string.Empty;
 
         private Seat[,] _seats = null!;
         private int _rows = 10;
@@ -95,6 +100,11 @@ namespace SmartSeating
             InitializeComponent();
 
             studentListView.ItemsSource = _students;
+            _studentView = CollectionViewSource.GetDefaultView(studentListView.ItemsSource);
+            if (_studentView != null)
+            {
+                _studentView.Filter = StudentFilter;
+            }
             InitializeResourceCache();
             HookCanvasEvents();
             RootGrid.KeyDown += RootGrid_KeyDown;
@@ -149,6 +159,132 @@ namespace SmartSeating
             seatCanvas.MouseMove += SeatCanvas_MouseMove;
             seatCanvas.MouseLeftButtonUp += SeatCanvas_MouseLeftButtonUp;
         }
+
+        #region 学生列表与搜索
+        private bool StudentFilter(object obj)
+        {
+            if (obj is not Student student)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(_studentSearchText))
+            {
+                return true;
+            }
+
+            return student.Name.Contains(_studentSearchText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void TxtStudentSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _studentSearchText = txtStudentSearch.Text?.Trim() ?? string.Empty;
+            _studentView?.Refresh();
+            UpdateSeatSummary();
+        }
+
+        private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            txtStudentSearch.Text = string.Empty;
+        }
+
+        private void StudentListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (studentListView.SelectedItem is not Student student)
+            {
+                return;
+            }
+
+            var seatOfStudent = FindSeatOfStudent(student.Name);
+            if (seatOfStudent.HasValue)
+            {
+                if (_activeSeat.HasValue && _activeSeat.Value == seatOfStudent.Value)
+                {
+                    return;
+                }
+
+                _selection.Clear();
+                _selection.Add(seatOfStudent.Value);
+                DrawSeatCanvas();
+                ShowStudentDetailForPosition(seatOfStudent.Value.row, seatOfStudent.Value.col);
+                txtStatus.Text = $"已定位到 {student.Name} 的座位。";
+            }
+            else
+            {
+                _activeSeat = null;
+                lblPosition.Text = _noSeatLabel;
+                studentDetailsPanel.IsEnabled = true;
+                PopulateStudentFields(student);
+                chkFixed.IsChecked = false;
+                chkDisabled.IsChecked = false;
+                txtStatus.Text = $"{student.Name} 尚未被安排座位。请选择一个座位后进行放置。";
+            }
+        }
+
+        private void StudentListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (studentListView.SelectedItem is not Student student)
+            {
+                return;
+            }
+
+            if (_activeSeat == null)
+            {
+                txtStatus.Text = "请先在座位图中选择一个座位。";
+                return;
+            }
+
+            TryAssignStudentToSeat(student, _activeSeat.Value);
+        }
+
+        private void BtnAssignSelectedStudent_Click(object sender, RoutedEventArgs e)
+        {
+            if (studentListView.SelectedItem is not Student student)
+            {
+                txtStatus.Text = "请先选择一个学生。";
+                return;
+            }
+
+            if (_activeSeat == null)
+            {
+                txtStatus.Text = "请先在座位图中选择一个座位。";
+                return;
+            }
+
+            TryAssignStudentToSeat(student, _activeSeat.Value);
+        }
+
+        private bool TryAssignStudentToSeat(Student student, (int row, int col) targetSeat)
+        {
+            var seat = _seats[targetSeat.row, targetSeat.col];
+
+            if (seat.IsDisabled)
+            {
+                txtStatus.Text = "当前座位处于禁用状态，无法放置学生。";
+                return false;
+            }
+
+            if (seat.IsFixed && seat.Student != null && !string.Equals(seat.Student.Name, student.Name, StringComparison.Ordinal))
+            {
+                txtStatus.Text = "该座位已被固定给另一名学生。";
+                return false;
+            }
+
+            var existingSeat = FindSeatOfStudent(student.Name);
+            if (existingSeat.HasValue)
+            {
+                _seats[existingSeat.Value.row, existingSeat.Value.col].Student = null;
+            }
+
+            seat.Student = student;
+            _selection.Clear();
+            _selection.Add(targetSeat);
+            DrawSeatCanvas();
+            ShowStudentDetailForPosition(targetSeat.row, targetSeat.col);
+            txtStatus.Text = $"已将 {student.Name} 调整至 ({targetSeat.row + 1}, {targetSeat.col + 1})。";
+            return true;
+        }
+        #endregion
 
         #region 座位生成与绘制
         private void GenerateSeats_Click(object sender, RoutedEventArgs e)
@@ -228,7 +364,7 @@ namespace SmartSeating
             GenerateSeats(_rows, _cols, true);
             _selection.Clear();
             _activeSeat = null;
-            lblPosition.Text = "(无)";
+            lblPosition.Text = _noSeatLabel;
             txtStudentName.Text = string.Empty;
             studentDetailsPanel.IsEnabled = false;
             txtHeightWeight.Text = "0";
@@ -349,6 +485,51 @@ namespace SmartSeating
                     }), doubleClick);
                     rect.InputBindings.Add(toggleFixedBinding);
                 }
+            }
+
+            UpdateSeatSummary();
+        }
+
+        private void UpdateSeatSummary()
+        {
+            if (_seats == null)
+            {
+                return;
+            }
+
+            int totalSeats = _rows * _cols;
+            int assigned = 0;
+            int disabled = 0;
+
+            foreach (var seat in _seats)
+            {
+                if (seat.IsDisabled)
+                {
+                    disabled++;
+                }
+
+                if (seat.Student != null)
+                {
+                    assigned++;
+                }
+            }
+
+            int empty = Math.Max(0, totalSeats - assigned - disabled);
+            lblTotalSeats.Text = totalSeats.ToString();
+            lblAssignedSeats.Text = assigned.ToString();
+            lblEmptySeats.Text = empty.ToString();
+            lblDisabledSeats.Text = disabled.ToString();
+
+            lblTotalStudents.Text = _students.Count.ToString();
+            lblUnassignedStudents.Text = Math.Max(0, _students.Count - assigned).ToString();
+
+            if (_studentView != null)
+            {
+                lblVisibleStudents.Text = _studentView.Cast<object>().Count().ToString();
+            }
+            else
+            {
+                lblVisibleStudents.Text = _students.Count.ToString();
             }
         }
 
@@ -582,32 +763,8 @@ namespace SmartSeating
         #endregion
 
         #region 右侧详情面板
-        private void ClearStudentDetailPanel()
+        private void PopulateStudentFields(Student? student)
         {
-            _activeSeat = null;
-            lblPosition.Text = _selection.Count > 1 ? "(多选)" : "(无)";
-            txtStudentName.Text = string.Empty;
-            studentDetailsPanel.IsEnabled = false;
-            txtHeightWeight.Text = "0";
-            txtImportanceWeight.Text = "0";
-            txtPreferStudents.Text = string.Empty;
-            txtAvoidStudents.Text = string.Empty;
-            txtPreferArea.Text = string.Empty;
-            chkFixed.IsChecked = false;
-            chkDisabled.IsChecked = false;
-        }
-
-        private void ShowStudentDetailForPosition(int row, int col)
-        {
-            _activeSeat = (row, col);
-            lblPosition.Text = $"({row + 1}, {col + 1})";
-            var seat = _seats[row, col];
-            var student = seat.Student;
-
-            chkFixed.IsChecked = seat.IsFixed;
-            chkDisabled.IsChecked = seat.IsDisabled;
-            studentDetailsPanel.IsEnabled = true;
-
             if (student == null)
             {
                 txtStudentName.Text = string.Empty;
@@ -625,6 +782,39 @@ namespace SmartSeating
                 txtPreferStudents.Text = string.Join(", ", student.PreferStudents);
                 txtAvoidStudents.Text = string.Join(", ", student.AvoidStudents);
                 txtPreferArea.Text = student.PreferArea;
+            }
+        }
+
+        private void ClearStudentDetailPanel()
+        {
+            _activeSeat = null;
+            lblPosition.Text = _selection.Count > 1 ? "(多选)" : _noSeatLabel;
+            studentDetailsPanel.IsEnabled = false;
+            PopulateStudentFields(null);
+            chkFixed.IsChecked = false;
+            chkDisabled.IsChecked = false;
+        }
+
+        private void ShowStudentDetailForPosition(int row, int col)
+        {
+            _activeSeat = (row, col);
+            lblPosition.Text = $"({row + 1}, {col + 1})";
+            var seat = _seats[row, col];
+            var student = seat.Student;
+
+            chkFixed.IsChecked = seat.IsFixed;
+            chkDisabled.IsChecked = seat.IsDisabled;
+            studentDetailsPanel.IsEnabled = true;
+            PopulateStudentFields(student);
+
+            if (student != null && !ReferenceEquals(studentListView.SelectedItem, student))
+            {
+                studentListView.SelectedItem = student;
+                studentListView.ScrollIntoView(student);
+            }
+            else if (student == null)
+            {
+                studentListView.SelectedItem = null;
             }
         }
 
