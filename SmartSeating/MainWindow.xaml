@@ -1,0 +1,125 @@
+<Window x:Class="SmartSeating.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        mc:Ignorable="d"
+        Title="SmartSeating - 智能座位管理"
+        Height="900"
+        Width="1600"
+        WindowStartupLocation="CenterScreen">
+
+    <Grid x:Name="RootGrid" Margin="10" Focusable="True">
+        <Grid.Resources>
+            <SolidColorBrush x:Key="SeatNormalBrush" Color="#FFF9F9F9" />
+            <SolidColorBrush x:Key="SeatFixedBrush" Color="#FFFFF100" />
+            <SolidColorBrush x:Key="SeatDisabledBrush" Color="#FFE81123" />
+            <SolidColorBrush x:Key="SeatStrokeBrush" Color="#FF8A8886" />
+            <SolidColorBrush x:Key="SeatSelectedStrokeBrush" Color="#FF6A8EBB" />
+            <SolidColorBrush x:Key="SeatHoverStrokeBrush" Color="#FF005FB8" />
+            <SolidColorBrush x:Key="SeatTextBrush" Color="#FF201F1E" />
+            <sys:Double x:Key="SeatFontSize">12</sys:Double>
+            <sys:Double x:Key="SeatCornerRadius">6</sys:Double>
+        </Grid.Resources>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="360" />
+        </Grid.ColumnDefinitions>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 顶部操作条 -->
+        <StackPanel Grid.Row="0" Grid.ColumnSpan="3" Orientation="Horizontal" VerticalAlignment="Center">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="行:" VerticalAlignment="Center" Margin="4,0" />
+                <TextBox x:Name="txtRows" Width="50" Text="10" Margin="0,0,4,0" />
+                <TextBlock Text="列:" VerticalAlignment="Center" Margin="4,0" />
+                <TextBox x:Name="txtCols" Width="50" Text="10" Margin="0,0,4,0" />
+                <Button Content="应用尺寸" Click="GenerateSeats_Click" />
+                <Button Content="清空所有学生" Click="BtnClearAllSeats_Click" Margin="8,0,0,0" />
+            </StackPanel>
+            <Separator Margin="8,0" Width="1" />
+            <Button Content="一键放置" Click="BtnPlaceAllStudents_Click" Margin="0,0,8,0" />
+            <Button Content="智能排座" Click="BtnRunArrangement_Click" FontWeight="SemiBold" />
+            <Separator Margin="8,0" Width="1" />
+            <StackPanel Orientation="Horizontal">
+                <Button Content="导入 Excel (名单)" Click="BtnImportExcel_Click" Margin="0,0,4,0" />
+                <Button Content="导入 配置 (JSON)" Click="BtnImportConfig_Click" Margin="0,0,4,0" />
+                <Button Content="导出 配置 (JSON)" Click="BtnExportConfig_Click" Margin="0,0,4,0" />
+                <Button Content="导出 座位Excel" Click="BtnExportExcel_Click" Margin="0,0,4,0" />
+                <Button Content="导出 图片 (PNG)" Click="BtnExportImage_Click" />
+            </StackPanel>
+            <TextBlock x:Name="txtStatus" Margin="12,0,0,0" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <ProgressBar x:Name="progressBar" Grid.Row="1" Grid.ColumnSpan="3" Height="8" Margin="0,8" Minimum="0" Maximum="100" Visibility="Collapsed" />
+
+        <!-- 左侧学生列表 -->
+        <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
+            <ListView x:Name="studentListView" Grid.Row="1">
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Name}" FontSize="14" Padding="4" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
+
+        <!-- 座位画布 -->
+        <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Canvas x:Name="seatCanvas" Background="Transparent" />
+        </ScrollViewer>
+
+        <!-- 右侧详情面板 -->
+        <ScrollViewer Grid.Row="2" Grid.Column="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="12,0,0,0">
+                <TextBlock Text="座位信息" FontSize="16" FontWeight="Bold" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <TextBlock Text="位置:" VerticalAlignment="Center" />
+                    <TextBlock x:Name="lblPosition" Margin="4,0,0,0" VerticalAlignment="Center" Text="(无)" />
+                </StackPanel>
+                <TextBlock Text="学生姓名:" Margin="0,8,0,0" />
+                <TextBox x:Name="txtStudentName" ToolTip="输入或选择学生" />
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <CheckBox x:Name="chkFixed" Content="固定此座位" Margin="0,0,8,0" />
+                    <CheckBox x:Name="chkDisabled" Content="禁用此座位" />
+                </StackPanel>
+                <ContentControl x:Name="studentDetailsPanel" Margin="0,12,0,0">
+                    <StackPanel>
+                        <Separator Margin="0,4" />
+                        <TextBlock Text="学生限制与权重" FontWeight="SemiBold" />
+                        <TextBlock Text="身高权重 (正数高/负数矮):" Margin="0,8,0,0" />
+                        <TextBox x:Name="txtHeightWeight" ToolTip="例如: 100" />
+                        <TextBlock Text="重要度权重 (需靠前):" Margin="0,8,0,0" />
+                        <TextBox x:Name="txtImportanceWeight" ToolTip="例如: 200" />
+                        <TextBlock Text="希望靠近的学生 (用逗号分隔):" Margin="0,8,0,0" />
+                        <TextBox x:Name="txtPreferStudents" AcceptsReturn="True" Height="60" TextWrapping="Wrap" />
+                        <TextBlock Text="希望远离的学生 (用逗号分隔):" Margin="0,8,0,0" />
+                        <TextBox x:Name="txtAvoidStudents" AcceptsReturn="True" Height="60" TextWrapping="Wrap" />
+                        <TextBlock Text="倾向区域 (格式: R1,C1-R2,C2):" Margin="0,8,0,0" />
+                        <TextBox x:Name="txtPreferArea" ToolTip="例如 '1,1-3,10' 表示前三行，'5,5' 表示第5行第5列" />
+                    </StackPanel>
+                </ContentControl>
+                <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+                    <Button Content="保存更改" Click="BtnSaveStudentToSeat_Click" Margin="0,0,8,0" />
+                    <Button Content="清空此座位" Click="BtnClearStudentFromSeat_Click" />
+                </StackPanel>
+                <TextBlock Text="导入名单示例：Excel 第一列（从 A1 开始），每行一个姓名。" Foreground="Gray" FontSize="12" Margin="0,20,0,0" TextWrapping="Wrap" />
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- 遮罩层，用于异步排座 -->
+        <Grid x:Name="modalOverlay" Grid.Row="0" Grid.RowSpan="3" Grid.Column="0" Grid.ColumnSpan="3" Background="#80000000" Visibility="Collapsed" />
+    </Grid>
+</Window>
