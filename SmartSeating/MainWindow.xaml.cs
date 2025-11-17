@@ -3,6 +3,7 @@ using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
@@ -11,6 +12,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -69,8 +71,11 @@ namespace SmartSeating
         private const string DefaultConfigFileName = "SeatingConfig.json";
 
         private readonly ObservableCollection<Student> _students = new();
+        private readonly ICollectionView _studentsView;
         private readonly HashSet<(int row, int col)> _selection = new();
         private readonly Random _random = new();
+
+        private string _studentSearchText = string.Empty;
 
         private Seat[,] _seats = null!;
         private int _rows = 10;
@@ -94,7 +99,10 @@ namespace SmartSeating
         {
             InitializeComponent();
 
-            studentListView.ItemsSource = _students;
+            _students.CollectionChanged += Students_CollectionChanged;
+            _studentsView = CollectionViewSource.GetDefaultView(_students);
+            _studentsView.Filter = StudentFilter;
+            studentListView.ItemsSource = _studentsView;
             InitializeResourceCache();
             HookCanvasEvents();
             RootGrid.KeyDown += RootGrid_KeyDown;
@@ -104,6 +112,11 @@ namespace SmartSeating
 
             Loaded += MainWindow_LoadedAsync;
             Closing += MainWindow_ClosingAsync;
+        }
+
+        private void Students_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            Dispatcher.Invoke(() => UpdateSeatSummary());
         }
 
         private async void MainWindow_LoadedAsync(object sender, RoutedEventArgs e)
@@ -149,6 +162,83 @@ namespace SmartSeating
             seatCanvas.MouseMove += SeatCanvas_MouseMove;
             seatCanvas.MouseLeftButtonUp += SeatCanvas_MouseLeftButtonUp;
         }
+
+        #region 学生列表增强
+        private bool StudentFilter(object obj)
+        {
+            if (obj is not Student student)
+            {
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(_studentSearchText))
+            {
+                return true;
+            }
+
+            return student.Name.Contains(_studentSearchText, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void TxtStudentSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _studentSearchText = txtStudentSearch.Text?.Trim() ?? string.Empty;
+            _studentsView.Refresh();
+        }
+
+        private void BtnClearSearch_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrEmpty(txtStudentSearch.Text))
+            {
+                txtStudentSearch.Focus();
+                return;
+            }
+
+            txtStudentSearch.Text = string.Empty;
+        }
+
+        private void StudentListView_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (studentListView.SelectedItem is not Student student)
+            {
+                return;
+            }
+
+            var seat = FindSeatOfStudent(student.Name);
+            if (seat.HasValue)
+            {
+                _selection.Clear();
+                _selection.Add(seat.Value);
+                DrawSeatCanvas();
+                ShowStudentDetailForPosition(seat.Value.row, seat.Value.col);
+                ScrollSeatIntoView(seat.Value.row, seat.Value.col);
+                txtStatus.Text = $"已定位到 {student.Name} 的座位。";
+            }
+            else
+            {
+                txtStatus.Text = $"{student.Name} 尚未被安排座位。";
+            }
+        }
+
+        private void ScrollSeatIntoView(int row, int col)
+        {
+            if (seatScrollViewer == null)
+            {
+                return;
+            }
+
+            seatCanvas.UpdateLayout();
+            seatScrollViewer.UpdateLayout();
+
+            double seatX = col * (SeatWidth + SeatSpacing);
+            double seatY = row * (SeatHeight + SeatSpacing);
+
+            double targetX = seatX - seatScrollViewer.ViewportWidth / 2 + SeatWidth / 2;
+            double targetY = seatY - seatScrollViewer.ViewportHeight / 2 + SeatHeight / 2;
+
+            seatScrollViewer.ScrollToHorizontalOffset(Math.Max(0, targetX));
+            seatScrollViewer.ScrollToVerticalOffset(Math.Max(0, targetY));
+        }
+        #endregion
 
         #region 座位生成与绘制
         private void GenerateSeats_Click(object sender, RoutedEventArgs e)
@@ -350,6 +440,8 @@ namespace SmartSeating
                     rect.InputBindings.Add(toggleFixedBinding);
                 }
             }
+
+            UpdateSeatSummary();
         }
 
         private void ApplyHoverStroke(Rectangle rect, bool isHover)
@@ -368,6 +460,52 @@ namespace SmartSeating
                     rect.StrokeThickness = isHover ? 2 : 1;
                 }
             }
+        }
+
+        private void UpdateSeatSummary()
+        {
+            if (txtSeatSummary == null)
+            {
+                return;
+            }
+
+            if (_seats == null)
+            {
+                txtSeatSummary.Text = "暂无座位数据。";
+                return;
+            }
+
+            int totalSeats = _rows * _cols;
+            int disabledSeats = 0;
+            int assignedSeats = 0;
+            int fixedSeats = 0;
+
+            foreach (var seat in _seats)
+            {
+                if (seat.IsDisabled)
+                {
+                    disabledSeats++;
+                }
+
+                if (seat.IsFixed)
+                {
+                    fixedSeats++;
+                }
+
+                if (!seat.IsDisabled && seat.Student != null)
+                {
+                    assignedSeats++;
+                }
+            }
+
+            int availableSeats = totalSeats - disabledSeats;
+            int emptySeats = Math.Max(0, availableSeats - assignedSeats);
+            int unseatedStudents = Math.Max(0, _students.Count - assignedSeats);
+
+            txtSeatSummary.Text =
+                $"总座位 {totalSeats} 个（可用 {availableSeats}，禁用 {disabledSeats}）\n" +
+                $"已安排 {assignedSeats} 人（固定 {fixedSeats}），空位 {emptySeats} 个\n" +
+                $"学生总数 {_students.Count}，待安排 {unseatedStudents} 人";
         }
         #endregion
 
@@ -854,7 +992,7 @@ namespace SmartSeating
                 }
             }
 
-            GenerateSeats(_rows, _cols, true); // Generate empty seats first
+            GenerateSeats(_rows, _cols); // 保留学生列表，仅重置座位
             var studentMap = _students.ToDictionary(s => s.Name, s => s);
 
             if (config.Assignments != null)

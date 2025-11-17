@@ -64,20 +64,40 @@
         <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
-            <ListView x:Name="studentListView" Grid.Row="1">
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBox x:Name="txtStudentSearch"
+                         Width="160"
+                         Margin="0,0,6,0"
+                         ToolTip="输入关键字过滤学生"
+                         TextChanged="TxtStudentSearch_TextChanged"
+                         VerticalContentAlignment="Center"
+                         Tag="搜索学生" />
+                <Button Content="清除"
+                        Padding="12,2"
+                        Click="BtnClearSearch_Click" />
+            </StackPanel>
+            <ListView x:Name="studentListView" Grid.Row="2" MouseDoubleClick="StudentListView_MouseDoubleClick">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding Name}" FontSize="14" Padding="4" />
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+            <Border Grid.Row="3" Margin="0,8,0,0" Padding="12" Background="#FFF5F5F5" BorderBrush="#FFE0E0E0" BorderThickness="1">
+                <StackPanel>
+                    <TextBlock Text="座位统计" FontWeight="Bold" />
+                    <TextBlock x:Name="txtSeatSummary" Margin="0,6,0,0" TextWrapping="Wrap" Foreground="#FF444444" />
+                </StackPanel>
+            </Border>
         </Grid>
 
         <!-- 座位画布 -->
-        <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="seatScrollViewer" Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Canvas x:Name="seatCanvas" Background="Transparent" />
         </ScrollViewer>
 
