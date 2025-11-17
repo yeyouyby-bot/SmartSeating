@@ -24,7 +24,7 @@
         </Grid.Resources>
 
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="240" />
+            <ColumnDefinition Width="260" />
             <ColumnDefinition Width="*" />
             <ColumnDefinition Width="360" />
         </Grid.ColumnDefinitions>
@@ -64,26 +64,56 @@
         <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
             <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
-            <ListView x:Name="studentListView" Grid.Row="1">
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,8">
+                <TextBox x:Name="txtStudentSearch" Width="150" Margin="0,0,6,0" VerticalContentAlignment="Center" ToolTip="输入关键字以筛选学生" TextChanged="TxtStudentSearch_TextChanged" />
+                <Button Content="清除" Width="60" Click="BtnClearStudentSearch_Click" />
+            </StackPanel>
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,0,0,8">
+                <Button Content="分配到所选座位" Click="BtnAssignStudentToSeat_Click" Margin="0,0,8,0" />
+                <Button Content="定位学生座位" Click="BtnLocateStudent_Click" />
+            </StackPanel>
+            <ListView x:Name="studentListView" Grid.Row="3" MouseDoubleClick="StudentListView_MouseDoubleClick">
                 <ListView.ItemTemplate>
                     <DataTemplate>
                         <TextBlock Text="{Binding Name}" FontSize="14" Padding="4" />
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+            <TextBlock x:Name="txtStudentSummary" Grid.Row="4" Margin="0,8,0,0" Foreground="Gray" TextWrapping="Wrap" />
         </Grid>
 
         <!-- 座位画布 -->
-        <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="seatScrollViewer" Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
             <Canvas x:Name="seatCanvas" Background="Transparent" />
         </ScrollViewer>
 
         <!-- 右侧详情面板 -->
         <ScrollViewer Grid.Row="2" Grid.Column="2" VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="12,0,0,0">
+                <Border Background="#FFF6F6F6" Padding="10" CornerRadius="8" Margin="0,0,0,12">
+                    <StackPanel>
+                        <TextBlock Text="图例与概览" FontSize="14" FontWeight="Bold" Margin="0,0,0,8" />
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Rectangle Width="16" Height="16" Fill="{StaticResource SeatNormalBrush}" Stroke="{StaticResource SeatStrokeBrush}" Margin="0,0,6,0" />
+                            <TextBlock Text="普通座位" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Rectangle Width="16" Height="16" Fill="{StaticResource SeatFixedBrush}" Stroke="{StaticResource SeatStrokeBrush}" Margin="0,0,6,0" />
+                            <TextBlock Text="固定座位" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <Rectangle Width="16" Height="16" Fill="{StaticResource SeatDisabledBrush}" Stroke="{StaticResource SeatStrokeBrush}" Margin="0,0,6,0" />
+                            <TextBlock Text="禁用座位" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="txtSeatSummary" Margin="0,8,0,0" TextWrapping="Wrap" Foreground="#FF3C3C3C" />
+                    </StackPanel>
+                </Border>
                 <TextBlock Text="座位信息" FontSize="16" FontWeight="Bold" />
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <TextBlock Text="位置:" VerticalAlignment="Center" />
