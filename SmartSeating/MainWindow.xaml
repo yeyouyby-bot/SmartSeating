@@ -64,22 +64,68 @@
         <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
+
             <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
-            <ListView x:Name="studentListView" Grid.Row="1">
-                <ListView.ItemTemplate>
-                    <DataTemplate>
-                        <TextBlock Text="{Binding Name}" FontSize="14" Padding="4" />
-                    </DataTemplate>
-                </ListView.ItemTemplate>
-            </ListView>
+
+            <TextBox x:Name="txtStudentSearch"
+                     Grid.Row="1"
+                     Margin="0,0,0,8"
+                     Height="28"
+                     VerticalContentAlignment="Center"
+                     ToolTip="输入关键字以过滤名单"
+                     TextChanged="TxtStudentSearch_TextChanged" />
+
+            <TextBlock x:Name="lblStudentStats"
+                       Grid.Row="2"
+                       FontSize="12"
+                       Foreground="Gray"
+                       Margin="0,0,0,8" />
+
+            <Border Grid.Row="3" BorderBrush="#FFE1E1E1" BorderThickness="1" CornerRadius="6">
+                <ListView x:Name="studentListView"
+                          SelectionChanged="StudentListView_SelectionChanged">
+                    <ListView.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel>
+                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
+                                <TextBlock Text="选择即可定位到座位" FontSize="11" Foreground="Gray" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </Border>
         </Grid>
 
         <!-- 座位画布 -->
-        <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-            <Canvas x:Name="seatCanvas" Background="Transparent" />
-        </ScrollViewer>
+        <Grid Grid.Row="2" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,8" HorizontalAlignment="Left">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Rectangle Width="18" Height="18" Fill="{StaticResource SeatNormalBrush}" Stroke="{StaticResource SeatStrokeBrush}" RadiusX="4" RadiusY="4" Margin="0,0,4,0" />
+                    <TextBlock Text="普通座位" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                    <Rectangle Width="18" Height="18" Fill="{StaticResource SeatFixedBrush}" Stroke="{StaticResource SeatStrokeBrush}" RadiusX="4" RadiusY="4" Margin="0,0,4,0" />
+                    <TextBlock Text="固定" VerticalAlignment="Center" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Rectangle Width="18" Height="18" Fill="{StaticResource SeatDisabledBrush}" Stroke="{StaticResource SeatStrokeBrush}" RadiusX="4" RadiusY="4" Margin="0,0,4,0" />
+                    <TextBlock Text="禁用" VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Canvas x:Name="seatCanvas" Background="Transparent" />
+            </ScrollViewer>
+        </Grid>
 
         <!-- 右侧详情面板 -->
         <ScrollViewer Grid.Row="2" Grid.Column="2" VerticalScrollBarVisibility="Auto">
