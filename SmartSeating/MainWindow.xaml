@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:sys="clr-namespace:System;assembly=mscorlib"
+        xmlns:converters="clr-namespace:SmartSeating.Converters"
         mc:Ignorable="d"
         Title="SmartSeating - 智能座位管理"
         Height="900"
@@ -21,6 +22,7 @@
             <SolidColorBrush x:Key="SeatTextBrush" Color="#FF201F1E" />
             <sys:Double x:Key="SeatFontSize">12</sys:Double>
             <sys:Double x:Key="SeatCornerRadius">6</sys:Double>
+            <converters:NullOrEmptyToVisibilityConverter x:Key="NullOrEmptyToVisibilityConverter" />
         </Grid.Resources>
 
         <Grid.ColumnDefinitions>
@@ -64,22 +66,99 @@
         <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,12,0">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
             </Grid.RowDefinitions>
-            <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,0,8" />
-            <ListView x:Name="studentListView" Grid.Row="1">
+            <StackPanel Orientation="Horizontal" Grid.Row="0" VerticalAlignment="Center">
+                <TextBlock Text="学生名单" FontSize="16" FontWeight="Bold" Margin="0,0,8,0" />
+                <Border Background="#19000000" Padding="4,1" CornerRadius="4">
+                    <TextBlock FontSize="12" Foreground="#7A7A7A" Text="双击名单可快速放置到当前座位" />
+                </Border>
+            </StackPanel>
+            <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,8,0,8">
+                <TextBox x:Name="txtStudentSearch" Width="170" Margin="0,0,8,0" ToolTip="根据姓名筛选学生" TextChanged="TxtStudentSearch_TextChanged" />
+                <Button Content="清除" Width="70" Click="BtnClearSearch_Click" />
+                <Button Content="放入所选座位" Margin="8,0,0,0" Click="BtnAssignSelectedStudent_Click" />
+            </StackPanel>
+            <ListView x:Name="studentListView" Grid.Row="2" SelectionChanged="StudentListView_SelectionChanged" MouseDoubleClick="StudentListView_MouseDoubleClick">
                 <ListView.ItemTemplate>
                     <DataTemplate>
-                        <TextBlock Text="{Binding Name}" FontSize="14" Padding="4" />
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding PreferArea, StringFormat=偏好: {0}}" FontSize="11" Foreground="#7A7A7A" Visibility="{Binding PreferArea, Converter={StaticResource NullOrEmptyToVisibilityConverter}}" />
+                        </StackPanel>
                     </DataTemplate>
                 </ListView.ItemTemplate>
             </ListView>
+            <Border Grid.Row="3" Padding="8" Background="#0F000000" CornerRadius="8" Margin="0,8,0,0">
+                <StackPanel>
+                    <TextBlock Text="名单概览" FontWeight="SemiBold" />
+                    <WrapPanel Margin="0,6,0,0" ItemWidth="120" ItemHeight="22">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="总人数:" />
+                            <TextBlock x:Name="lblTotalStudents" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="当前显示:" />
+                            <TextBlock x:Name="lblVisibleStudents" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="未排座:" />
+                            <TextBlock x:Name="lblUnassignedStudents" Margin="4,0,0,0" />
+                        </StackPanel>
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
         </Grid>
 
         <!-- 座位画布 -->
-        <ScrollViewer Grid.Row="2" Grid.Column="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-            <Canvas x:Name="seatCanvas" Background="Transparent" />
-        </ScrollViewer>
+        <Grid Grid.Row="2" Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Padding="10" Background="#0F000000" CornerRadius="8" Margin="0,0,0,8">
+                <StackPanel>
+                    <TextBlock Text="布局概览" FontWeight="SemiBold" />
+                    <WrapPanel Margin="0,6,0,4" ItemWidth="120" ItemHeight="22">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="总座位:" />
+                            <TextBlock x:Name="lblTotalSeats" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="已安排:" />
+                            <TextBlock x:Name="lblAssignedSeats" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="空位:" />
+                            <TextBlock x:Name="lblEmptySeats" Margin="4,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="禁用:" />
+                            <TextBlock x:Name="lblDisabledSeats" Margin="4,0,0,0" />
+                        </StackPanel>
+                    </WrapPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                            <Border Width="16" Height="16" Background="{StaticResource SeatNormalBrush}" BorderThickness="1" BorderBrush="{StaticResource SeatStrokeBrush}" CornerRadius="4" />
+                            <TextBlock Text="可用座位" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,16,0">
+                            <Border Width="16" Height="16" Background="{StaticResource SeatFixedBrush}" BorderThickness="1" BorderBrush="{StaticResource SeatStrokeBrush}" CornerRadius="4" />
+                            <TextBlock Text="固定座位" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Width="16" Height="16" Background="{StaticResource SeatDisabledBrush}" BorderThickness="1" BorderBrush="{StaticResource SeatStrokeBrush}" CornerRadius="4" />
+                            <TextBlock Text="禁用座位" Margin="6,0,0,0" />
+                        </StackPanel>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <Canvas x:Name="seatCanvas" Background="Transparent" />
+            </ScrollViewer>
+        </Grid>
 
         <!-- 右侧详情面板 -->
         <ScrollViewer Grid.Row="2" Grid.Column="2" VerticalScrollBarVisibility="Auto">
@@ -87,7 +166,7 @@
                 <TextBlock Text="座位信息" FontSize="16" FontWeight="Bold" />
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                     <TextBlock Text="位置:" VerticalAlignment="Center" />
-                    <TextBlock x:Name="lblPosition" Margin="4,0,0,0" VerticalAlignment="Center" Text="(无)" />
+                    <TextBlock x:Name="lblPosition" Margin="4,0,0,0" VerticalAlignment="Center" Text="(未分配)" />
                 </StackPanel>
                 <TextBlock Text="学生姓名:" Margin="0,8,0,0" />
                 <TextBox x:Name="txtStudentName" ToolTip="输入或选择学生" />
