@@ -11,6 +11,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -69,6 +70,7 @@ namespace SmartSeating
         private const string DefaultConfigFileName = "SeatingConfig.json";
 
         private readonly ObservableCollection<Student> _students = new();
+        private ICollectionView _studentsView = null!;
         private readonly HashSet<(int row, int col)> _selection = new();
         private readonly Random _random = new();
 
@@ -95,12 +97,16 @@ namespace SmartSeating
             InitializeComponent();
 
             studentListView.ItemsSource = _students;
+            _studentsView = CollectionViewSource.GetDefaultView(_students);
+            _studentsView.Filter = StudentFilter;
+            _students.CollectionChanged += (_, __) => UpdateStudentStats();
             InitializeResourceCache();
             HookCanvasEvents();
             RootGrid.KeyDown += RootGrid_KeyDown;
             RootGrid.Focus();
 
             GenerateSeats(_rows, _cols, true);
+            UpdateStudentStats();
 
             Loaded += MainWindow_LoadedAsync;
             Closing += MainWindow_ClosingAsync;
@@ -211,6 +217,7 @@ namespace SmartSeating
 
             _seats = newSeats;
             DrawSeatCanvas();
+            UpdateStudentStats();
 
             if (_rows > 0 && _cols > 0 && _selection.Count == 0)
             {
@@ -282,6 +289,7 @@ namespace SmartSeating
             }
 
             DrawSeatCanvas();
+            UpdateStudentStats();
             txtStatus.Text = queue.Count == 0 ? "已完成学生放置。" : "学生数量超过可用座位，部分学生未放置。";
         }
 
@@ -350,6 +358,8 @@ namespace SmartSeating
                     rect.InputBindings.Add(toggleFixedBinding);
                 }
             }
+
+            UpdateStudentStats();
         }
 
         private void ApplyHoverStroke(Rectangle rect, bool isHover)
@@ -459,10 +469,8 @@ namespace SmartSeating
             {
                 foreach (var (row, col) in _selection)
                 {
-                    var student = _seats[row, col].Student;
-                    if (student != null)
+                    if (_seats[row, col].Student != null)
                     {
-                        _students.Remove(student);
                         _seats[row, col].Student = null;
                     }
                 }
@@ -553,10 +561,8 @@ namespace SmartSeating
                 case Key.Back:
                     foreach (var (row, col) in _selection)
                     {
-                        var student = _seats[row, col].Student;
-                        if (student != null)
+                        if (_seats[row, col].Student != null)
                         {
-                            _students.Remove(student);
                             _seats[row, col].Student = null;
                         }
                     }
@@ -692,6 +698,7 @@ namespace SmartSeating
             DrawSeatCanvas();
             ShowStudentDetailForPosition(row, col); // Refresh details
             txtStatus.Text = "更改已保存。";
+            _studentsView.Refresh();
         }
 
         private (int row, int col)? FindSeatOfStudent(string studentName)
@@ -711,7 +718,6 @@ namespace SmartSeating
 
             if (seat.Student != null)
             {
-                _students.Remove(seat.Student);
                 seat.Student = null;
             }
 
@@ -752,6 +758,7 @@ namespace SmartSeating
 
                 BtnPlaceAllStudents_Click(this, new RoutedEventArgs()); // Auto-place them
                 txtStatus.Text = $"已成功导入并放置 {names.Count} 名学生。";
+                _studentsView.Refresh();
             }
             catch (Exception ex)
             {
@@ -877,6 +884,7 @@ namespace SmartSeating
             _selection.Clear();
             ClearStudentDetailPanel();
             txtStatus.Text = "配置已加载。";
+            _studentsView.Refresh();
         }
 
         private void BtnExportExcel_Click(object sender, RoutedEventArgs e)
@@ -1158,6 +1166,65 @@ namespace SmartSeating
                 }
             }
             return total;
+        }
+
+        private void TxtStudentSearch_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            _studentsView.Refresh();
+        }
+
+        private bool StudentFilter(object obj)
+        {
+            if (obj is not Student student) return false;
+            var keyword = txtStudentSearch.Text?.Trim();
+            if (string.IsNullOrEmpty(keyword)) return true;
+            return student.Name.Contains(keyword, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void StudentListView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (studentListView.SelectedItem is not Student student)
+            {
+                return;
+            }
+
+            var seat = FindSeatOfStudent(student.Name);
+            if (seat.HasValue)
+            {
+                _selection.Clear();
+                _selection.Add(seat.Value);
+                DrawSeatCanvas();
+                ShowStudentDetailForPosition(seat.Value.row, seat.Value.col);
+                ScrollSeatIntoView(seat.Value.row, seat.Value.col);
+                txtStatus.Text = $"已定位到 {student.Name} 的座位。";
+            }
+            else
+            {
+                txtStatus.Text = $"{student.Name} 暂无座位，可选择一个座位后点击保存。";
+            }
+        }
+
+        private void ScrollSeatIntoView(int row, int col)
+        {
+            double x = col * (SeatWidth + SeatSpacing);
+            double y = row * (SeatHeight + SeatSpacing);
+            var rect = new Rect(new Point(x, y), new Size(SeatWidth, SeatHeight));
+            seatCanvas.BringIntoView(rect);
+        }
+
+        private void UpdateStudentStats()
+        {
+            int total = _students.Count;
+            int assigned = 0;
+            if (_seats != null)
+            {
+                assigned = _seats.Cast<Seat>().Count(seat => seat.Student != null);
+            }
+            int unassigned = Math.Max(total - assigned, 0);
+            if (lblStudentStats != null)
+            {
+                lblStudentStats.Text = $"总数: {total}    已入座: {assigned}    待安排: {unassigned}";
+            }
         }
         #endregion
     }
